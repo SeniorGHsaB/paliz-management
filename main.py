@@ -52,3 +52,6 @@ def main():
 
 
     root.mainloop()
+
+
+main()
