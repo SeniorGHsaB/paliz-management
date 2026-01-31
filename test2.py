@@ -205,8 +205,8 @@ class BusinessManagementApp:
         text_label.pack(side='left', fill='x', expand=True, anchor='w')
 
         # نشانگر صفحه فعال
-        self.indicator = tk.Label(btn_frame, text="", bg=self.colors['sidebar'], width=2)
-        self.indicator.pack(side='right', padx=10)
+        indicator = tk.Label(btn_frame, text="", bg=self.colors['sidebar'], width=2)
+        indicator.pack(side='right', padx=10)
 
         # افکت hover و کلیک
         def on_enter(e):
@@ -214,18 +214,18 @@ class BusinessManagementApp:
                 btn_frame.config(bg=self.colors['hover_bg'])
                 icon_label.config(bg=self.colors['hover_bg'])
                 text_label.config(bg=self.colors['hover_bg'])
-                self.indicator.config(bg=self.colors['hover_bg'])
+                indicator.config(bg=self.colors['hover_bg'])
 
         def on_leave(e):
             if self.current_page != page_id:
                 btn_frame.config(bg=self.colors['sidebar'])
                 icon_label.config(bg=self.colors['sidebar'])
                 text_label.config(bg=self.colors['sidebar'])
-                self.indicator.config(bg=self.colors['sidebar'])
+                indicator.config(bg=self.colors['sidebar'])
 
         def on_click(e):
             self.current_page = page_id
-            self.highlight_active_menu()
+            self.highlight_active_menu(btn_frame)
             command()
 
         btn_frame.bind("<Enter>", on_enter)
@@ -240,28 +240,29 @@ class BusinessManagementApp:
         text_label.bind("<Leave>", on_leave)
         text_label.bind("<Button-1>", on_click)
 
-        # ذخیره ویجت‌ها برای تغییر رنگ بعداً
-        btn_frame.widgets = (btn_frame, icon_label, text_label, self.indicator)
+        # ذخیره اطلاعات
+        btn_frame.icon_label = icon_label
+        btn_frame.text_label = text_label
+        btn_frame.indicator = indicator
         btn_frame.page_id = page_id
 
         return btn_frame
 
-    def highlight_active_menu(self):
+    def highlight_active_menu(self, active_frame):
         """هایلایت کردن منوی فعال"""
-        for widget in self.content_area.winfo_children():
-            if hasattr(widget, 'page_id'):
+        # ریست همه منوها
+        for widget in self.content_area.master.winfo_children()[1].winfo_children():  # دسترسی به سایدبار
+            if isinstance(widget, tk.Frame) and hasattr(widget, 'page_id'):
                 if widget.page_id == self.current_page:
                     widget.config(bg=self.colors['accent'])
-                    for w in widget.widgets:
-                        w.config(bg=self.colors['accent'], fg='white')
+                    widget.icon_label.config(bg=self.colors['accent'], fg='white')
+                    widget.text_label.config(bg=self.colors['accent'], fg='white')
+                    widget.indicator.config(bg=self.colors['accent'])
                 else:
                     widget.config(bg=self.colors['sidebar'])
-                    for w in widget.widgets:
-                        w.config(bg=self.colors['sidebar'])
-                        if w == widget.widgets[2]:  # متن
-                            w.config(fg=self.colors['text_primary'])
-                        else:
-                            w.config(fg=self.colors['text_secondary'])
+                    widget.icon_label.config(bg=self.colors['sidebar'], fg=self.colors['text_secondary'])
+                    widget.text_label.config(bg=self.colors['sidebar'], fg=self.colors['text_primary'])
+                    widget.indicator.config(bg=self.colors['sidebar'])
 
     def create_stat_widget(self, parent, icon, text, value):
         """ایجاد ویجت آمار"""
@@ -281,6 +282,53 @@ class BusinessManagementApp:
                  bg=self.colors['sidebar'], fg=self.colors['text_primary']).pack(anchor='w')
 
         return frame
+
+    def create_status_bar(self):
+        """ایجاد نوار وضعیت"""
+        self.status_bar = tk.Frame(self.root,
+                                   bg=self.colors['title_bar_light'],
+                                   height=24)
+        self.status_bar.pack(fill='x')
+        self.status_bar.pack_propagate(False)
+
+        # سمت چپ - وضعیت
+        left_frame = tk.Frame(self.status_bar, bg=self.colors['title_bar_light'])
+        left_frame.pack(side='left', padx=10)
+
+        self.status_label = tk.Label(left_frame,
+                                     text="آماده",
+                                     bg=self.colors['title_bar_light'],
+                                     fg=self.colors['text_light'],
+                                     font=self.fonts['small'])
+        self.status_label.pack(side='left')
+
+        # سمت راست - اطلاعات
+        right_frame = tk.Frame(self.status_bar, bg=self.colors['title_bar_light'])
+        right_frame.pack(side='right', padx=10)
+
+        self.time_label = tk.Label(right_frame,
+                                   text="",
+                                   bg=self.colors['title_bar_light'],
+                                   fg=self.colors['text_light'],
+                                   font=self.fonts['small'])
+        self.time_label.pack(side='right', padx=10)
+
+        # آیکون‌های سیستم
+        system_icons = ["", "", "", ""]
+        for icon in system_icons:
+            tk.Label(right_frame,
+                     text=icon,
+                     bg=self.colors['title_bar_light'],
+                     fg=self.colors['text_light'],
+                     font=("Segoe MDL2 Assets", 10),
+                     padx=5,
+                     cursor='hand2').pack(side='right')
+
+    def update_time(self):
+        """به‌روزرسانی زمان"""
+        current_time = datetime.now().strftime("%H:%M:%S")
+        self.time_label.config(text=current_time)
+        self.root.after(1000, self.update_time)
 
     # ==================== صفحات اصلی ====================
 
@@ -338,12 +386,63 @@ class BusinessManagementApp:
         ]
 
         for activity, time in activities:
-            activity_widget = self.create_activity_widget(recent_frame, activity, time)
-            activity_widget.pack(fill='x', pady=5)
+            self.create_activity_widget(recent_frame, activity, time)
+
+    def create_dashboard_card(self, parent, icon, title, value, color, action_text):
+        """ایجاد کارت داشبورد"""
+        card = tk.Frame(parent, bg=self.colors['card_bg'],
+                        highlightbackground=self.colors['card_border'],
+                        highlightthickness=1)
+
+        # محتوا
+        content_frame = tk.Frame(card, bg=self.colors['card_bg'], padx=15, pady=15)
+        content_frame.pack(fill='both', expand=True)
+
+        # آیکون و عنوان
+        icon_frame = tk.Frame(content_frame, bg=self.colors['card_bg'])
+        icon_frame.pack(fill='x', pady=(0, 10))
+
+        tk.Label(icon_frame, text=icon, font=("Segoe MDL2 Assets", 20),
+                 bg=self.colors['card_bg'], fg=color).pack(side='left')
+
+        tk.Label(icon_frame, text=title, font=self.fonts['normal'],
+                 bg=self.colors['card_bg']).pack(side='left', padx=10)
+
+        # مقدار
+        tk.Label(content_frame, text=value, font=self.fonts['large'],
+                 bg=self.colors['card_bg'], fg=color).pack(anchor='w', pady=(0, 10))
+
+        # دکمه عمل
+        tk.Button(content_frame, text=action_text,
+                  bg=color, fg='white',
+                  font=self.fonts['small'], padx=15, pady=5,
+                  cursor='hand2').pack(anchor='w')
+
+        return card
+
+    def create_activity_widget(self, parent, activity, time):
+        """ایجاد ویجت فعالیت"""
+        frame = tk.Frame(parent, bg=self.colors['card_bg'],
+                         highlightbackground=self.colors['card_border'],
+                         highlightthickness=1)
+        frame.pack(fill='x', pady=5)
+
+        # نقطه
+        tk.Label(frame, text="●", font=self.fonts['normal'],
+                 bg=self.colors['card_bg'], fg=self.colors['accent']).pack(side='left', padx=10)
+
+        # متن فعالیت
+        tk.Label(frame, text=activity, font=self.fonts['normal'],
+                 bg=self.colors['card_bg']).pack(side='left', fill='x', expand=True, anchor='w')
+
+        # زمان
+        tk.Label(frame, text=time, font=self.fonts['small'],
+                 bg=self.colors['card_bg'], fg=self.colors['text_secondary']).pack(side='right', padx=10)
 
     def show_new_entry(self):
         """صفحه ورودی جدید"""
         self.clear_content_area()
+        self.status_label.config(text="صفحه ثبت ورودی جدید")
 
         # هدر
         header_frame = tk.Frame(self.content_area, bg=self.colors['bg'])
@@ -364,8 +463,7 @@ class BusinessManagementApp:
             ("عنوان ورودی", "entry"),
             ("مبلغ (ریال)", "number"),
             ("تاریخ", "date"),
-            ("توضیحات", "textarea"),
-            ("ضمیمه", "file")
+            ("توضیحات", "textarea")
         ]
 
         self.entry_fields = {}
@@ -411,22 +509,6 @@ class BusinessManagementApp:
                 textarea.grid(row=row, column=1, sticky='ew', pady=10, padx=5)
                 self.entry_fields[label] = textarea
 
-            elif field_type == "file":
-                file_frame = tk.Frame(form_frame, bg=self.colors['card_bg'])
-                file_frame.grid(row=row, column=1, sticky='ew', pady=10, padx=5)
-
-                entry = tk.Entry(file_frame, font=self.fonts['normal'],
-                                 bg=self.colors['input_bg'], bd=1, relief='solid',
-                                 width=30)
-                entry.pack(side='left', fill='x', expand=True)
-
-                btn = tk.Button(file_frame, text="انتخاب فایل",
-                                bg=self.colors['button_secondary'],
-                                fg='white', font=self.fonts['small'],
-                                command=lambda e=entry: self.select_file(e))
-                btn.pack(side='left', padx=5)
-                self.entry_fields[label] = entry
-
             row += 1
 
         form_frame.columnconfigure(1, weight=1)
@@ -450,9 +532,45 @@ class BusinessManagementApp:
                   font=self.fonts['normal'], padx=30, pady=10,
                   command=self.show_dashboard).pack(side='left', padx=5)
 
+    def save_entry(self):
+        """ذخیره ورودی جدید"""
+        try:
+            entry_data = {}
+            for label, field in self.entry_fields.items():
+                if isinstance(field, ttk.Combobox):
+                    entry_data[label] = field.get()
+                elif isinstance(field, scrolledtext.ScrolledText):
+                    entry_data[label] = field.get("1.0", tk.END).strip()
+                else:
+                    entry_data[label] = field.get()
+
+            # اعتبارسنجی
+            if not entry_data.get('عنوان ورودی'):
+                messagebox.showwarning("اخطار", "لطفا عنوان ورودی را وارد کنید")
+                return
+
+            # نمایش پیام موفقیت
+            messagebox.showinfo("موفقیت", "ورودی جدید با موفقیت ثبت شد")
+            self.show_dashboard()
+
+        except Exception as e:
+            messagebox.showerror("خطا", f"خطا در ثبت ورودی: {str(e)}")
+
+    def clear_form(self):
+        """پاک کردن فرم"""
+        for label, field in self.entry_fields.items():
+            if isinstance(field, ttk.Combobox):
+                if field['values']:
+                    field.set(field['values'][0])
+            elif isinstance(field, scrolledtext.ScrolledText):
+                field.delete("1.0", tk.END)
+            else:
+                field.delete(0, tk.END)
+
     def show_database(self):
         """صفحه پایگاه داده"""
         self.clear_content_area()
+        self.status_label.config(text="مدیریت پایگاه داده")
 
         # هدر
         header_frame = tk.Frame(self.content_area, bg=self.colors['bg'])
@@ -466,16 +584,15 @@ class BusinessManagementApp:
         action_frame.pack(fill='x', pady=10)
 
         actions = [
-            ("", "مشاهده همه داده‌ها", self.view_all_data),
+            ("", "مشاهده همه", self.view_all_data),
             ("", "پشتیبان‌گیری", self.backup_database),
             ("", "بازیابی", self.restore_database),
-            ("", "به‌روزرسانی", self.update_database),
+            ("", "ویرایش", self.edit_database),
             ("", "پاکسازی", self.clean_database)
         ]
 
         for icon, text, command in actions:
-            btn = self.create_action_button(action_frame, icon, text, command)
-            btn.pack(side='left', padx=5)
+            self.create_action_button(action_frame, icon, text, command)
 
         # جدول داده‌ها
         table_frame = tk.Frame(self.content_area, bg=self.colors['card_bg'],
@@ -484,7 +601,7 @@ class BusinessManagementApp:
         table_frame.pack(fill='both', expand=True, pady=20)
 
         # ایجاد Treeview
-        columns = ('id', 'type', 'title', 'amount', 'date', 'description')
+        columns = ('id', 'type', 'title', 'amount', 'date')
         tree = ttk.Treeview(table_frame, columns=columns, show='headings', height=10)
 
         # تعریف ستون‌ها
@@ -493,30 +610,27 @@ class BusinessManagementApp:
         tree.heading('title', text='عنوان')
         tree.heading('amount', text='مبلغ')
         tree.heading('date', text='تاریخ')
-        tree.heading('description', text='توضیحات')
 
         tree.column('id', width=50)
         tree.column('type', width=80)
         tree.column('title', width=150)
         tree.column('amount', width=100)
         tree.column('date', width=100)
-        tree.column('description', width=200)
 
         # نوار اسکرول
         scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=tree.yview)
         tree.configure(yscroll=scrollbar.set)
 
-        # قرار دادن ویجت‌ها
         tree.pack(side='left', fill='both', expand=True)
         scrollbar.pack(side='right', fill='y')
 
-        # اضافه کردن داده‌های نمونه
+        # داده‌های نمونه
         sample_data = [
-            (1, 'فروش', 'فروش محصول A', '1,500,000', '1402/10/15', 'فروش نقدی'),
-            (2, 'خرید', 'خرید مواد اولیه', '2,300,000', '1402/10/14', 'از تامین کننده X'),
-            (3, 'موجودی', 'موجودی انبار', '4,500,000', '1402/10/13', 'موجودی پایان ماه'),
-            (4, 'فروش', 'فروش محصول B', '800,000', '1402/10/12', 'فروش اقساطی'),
-            (5, 'سایر', 'هزینه تبلیغات', '600,000', '1402/10/11', 'تبلیغات اینستاگرام')
+            (1, 'فروش', 'فروش محصول A', '1,500,000', '1402/10/15'),
+            (2, 'خرید', 'خرید مواد اولیه', '2,300,000', '1402/10/14'),
+            (3, 'موجودی', 'موجودی انبار', '4,500,000', '1402/10/13'),
+            (4, 'فروش', 'فروش محصول B', '800,000', '1402/10/12'),
+            (5, 'سایر', 'هزینه تبلیغات', '600,000', '1402/10/11')
         ]
 
         for item in sample_data:
@@ -525,6 +639,7 @@ class BusinessManagementApp:
     def show_reports(self):
         """صفحه گزارش گیری"""
         self.clear_content_area()
+        self.status_label.config(text="گزارش‌گیری و آمار")
 
         # هدر
         header_frame = tk.Frame(self.content_area, bg=self.colors['bg'])
@@ -538,47 +653,19 @@ class BusinessManagementApp:
         reports_frame.pack(fill='x', pady=10)
 
         reports = [
-            ("", "گزارش مالی ماهانه", "تحلیل درآمد و هزینه‌ها", self.generate_financial_report),
-            ("📊", "گزارش فروش", "آمار فروش به تفکیک محصول", self.generate_sales_report),
-            ("📈", "گزارش کارکنان", "عملکرد و حضور و غیاب", self.generate_employee_report),
-            ("📉", "گزارش موجودی", "وضعیت انبار و کالاها", self.generate_inventory_report),
-            ("📋", "گزارش سفارشی", "ساخت گزارش دلخواه", self.generate_custom_report)
+            ("", "گزارش مالی", "تحلیل درآمد و هزینه‌ها", self.generate_financial_report),
+            ("📊", "گزارش فروش", "آمار فروش محصولات", self.generate_sales_report),
+            ("📈", "کارکنان", "عملکرد و حضور و غیاب", self.generate_employee_report),
+            ("📉", "موجودی", "وضعیت انبار", self.generate_inventory_report)
         ]
 
         for i, (icon, title, desc, command) in enumerate(reports):
-            card = self.create_report_card(reports_frame, icon, title, desc, command)
-            card.grid(row=i // 3, column=i % 3, padx=10, pady=10, sticky='nsew')
-            reports_frame.columnconfigure(i % 3, weight=1)
-
-        # فیلترهای گزارش
-        filter_frame = tk.Frame(self.content_area, bg=self.colors['card_bg'],
-                                highlightbackground=self.colors['card_border'],
-                                highlightthickness=1, padx=15, pady=15)
-        filter_frame.pack(fill='x', pady=20)
-
-        tk.Label(filter_frame, text="فیلترهای پیشرفته:",
-                 font=self.fonts['subtitle'], bg=self.colors['card_bg']).pack(anchor='w', pady=(0, 10))
-
-        # فیلترها
-        filters = tk.Frame(filter_frame, bg=self.colors['card_bg'])
-        filters.pack(fill='x')
-
-        tk.Label(filters, text="بازه زمانی:", font=self.fonts['normal'],
-                 bg=self.colors['card_bg']).grid(row=0, column=0, sticky='w', padx=5, pady=5)
-
-        date_frame = tk.Frame(filters, bg=self.colors['card_bg'])
-        date_frame.grid(row=0, column=1, sticky='w', padx=5, pady=5)
-
-        tk.Entry(date_frame, width=12, font=self.fonts['normal']).pack(side='left', padx=2)
-        tk.Label(date_frame, text="تا", bg=self.colors['card_bg']).pack(side='left', padx=2)
-        tk.Entry(date_frame, width=12, font=self.fonts['normal']).pack(side='left', padx=2)
-
-        tk.Button(filters, text="اعمال فیلترها", bg=self.colors['button_primary'],
-                  fg='white', font=self.fonts['small']).grid(row=0, column=2, padx=20)
+            self.create_report_card(reports_frame, icon, title, desc, command, i)
 
     def show_employees(self):
         """صفحه مدیریت کارکنان"""
         self.clear_content_area()
+        self.status_label.config(text="مدیریت کارکنان")
 
         # هدر
         header_frame = tk.Frame(self.content_area, bg=self.colors['bg'])
@@ -592,64 +679,22 @@ class BusinessManagementApp:
         management_frame.pack(fill='x', pady=10)
 
         actions = [
-            ("", "افزودن کارمند", self.add_employee),
-            ("", "ویرایش اطلاعات", self.edit_employee),
-            ("", "حذف کارمند", self.delete_employee),
-            ("", "لیست حقوق", self.salary_list),
-            ("", "تنظیمات دسترسی", self.access_settings)
+            ("", "افزودن", self.add_employee),
+            ("", "ویرایش", self.edit_employee),
+            ("", "حذف", self.delete_employee),
+            ("", "حقوق", self.salary_list)
         ]
 
         for icon, text, command in actions:
-            btn = self.create_action_button(management_frame, icon, text, command)
-            btn.pack(side='left', padx=5)
+            self.create_action_button(management_frame, icon, text, command)
 
         # جدول کارکنان
-        table_frame = tk.Frame(self.content_area, bg=self.colors['card_bg'],
-                               highlightbackground=self.colors['card_border'],
-                               highlightthickness=1, padx=10, pady=10)
-        table_frame.pack(fill='both', expand=True, pady=20)
-
-        # ایجاد Treeview برای کارکنان
-        columns = ('id', 'name', 'position', 'department', 'phone', 'status')
-        tree = ttk.Treeview(table_frame, columns=columns, show='headings', height=8)
-
-        # تعریف ستون‌ها
-        tree.heading('id', text='کد پرسنلی')
-        tree.heading('name', text='نام و نام خانوادگی')
-        tree.heading('position', text='سمت')
-        tree.heading('department', text='بخش')
-        tree.heading('phone', text='تلفن')
-        tree.heading('status', text='وضعیت')
-
-        tree.column('id', width=80)
-        tree.column('name', width=150)
-        tree.column('position', width=100)
-        tree.column('department', width=100)
-        tree.column('phone', width=100)
-        tree.column('status', width=80)
-
-        # نوار اسکرول
-        scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=tree.yview)
-        tree.configure(yscroll=scrollbar.set)
-
-        tree.pack(side='left', fill='both', expand=True)
-        scrollbar.pack(side='right', fill='y')
-
-        # داده‌های نمونه کارکنان
-        employees = [
-            (1001, 'علی احمدی', 'مدیر فروش', 'فروش', '09123456789', 'فعال'),
-            (1002, 'مریم محمدی', 'حسابدار', 'مالی', '09129876543', 'فعال'),
-            (1003, 'رضا کریمی', 'انباردار', 'انبار', '09131234567', 'فعال'),
-            (1004, 'سارا حسینی', 'منشی', 'اداری', '09137654321', 'مرخصی'),
-            (1005, 'امیر جعفری', 'برنامه نویس', 'فنی', '09149876543', 'فعال')
-        ]
-
-        for emp in employees:
-            tree.insert('', tk.END, values=emp)
+        self.create_employee_table()
 
     def show_search(self):
         """صفحه جستجو"""
         self.clear_content_area()
+        self.status_label.config(text="جستجوی پیشرفته")
 
         # هدر
         header_frame = tk.Frame(self.content_area, bg=self.colors['bg'])
@@ -664,57 +709,291 @@ class BusinessManagementApp:
                                 highlightthickness=1, padx=20, pady=20)
         search_frame.pack(fill='x', pady=10)
 
-        # فیلد جستجوی اصلی
-        main_search_frame = tk.Frame(search_frame, bg=self.colors['card_bg'])
-        main_search_frame.pack(fill='x', pady=(0, 15))
-
-        tk.Label(main_search_frame, text="عبارت جستجو:",
-                 font=self.fonts['normal'], bg=self.colors['card_bg']).pack(side='left', padx=5)
-
-        search_entry = tk.Entry(main_search_frame, font=self.fonts['normal'],
-                                width=50, bg=self.colors['input_bg'],
-                                bd=1, relief='solid')
+        # فیلد جستجو
+        search_entry = tk.Entry(search_frame, font=self.fonts['normal'],
+                                width=50, bg=self.colors['input_bg'])
         search_entry.pack(side='left', fill='x', expand=True, padx=5)
 
-        tk.Button(main_search_frame, text="جستجو",
+        tk.Button(search_frame, text="جستجو",
                   bg=self.colors['button_primary'], fg='white',
                   font=self.fonts['normal'], padx=20,
                   command=lambda: self.perform_search(search_entry.get())).pack(side='left', padx=5)
 
-        # فیلترهای جستجو
-        tk.Label(search_frame, text="فیلترهای جستجو:",
-                 font=self.fonts['subtitle'], bg=self.colors['card_bg']).pack(anchor='w', pady=(0, 10))
+    def show_settings(self):
+        """صفحه تنظیمات"""
+        self.clear_content_area()
+        self.status_label.config(text="تنظیمات سیستم")
 
-        filters_frame = tk.Frame(search_frame, bg=self.colors['card_bg'])
-        filters_frame.pack(fill='x')
+        # هدر
+        header_frame = tk.Frame(self.content_area, bg=self.colors['bg'])
+        header_frame.pack(fill='x', pady=(0, 20))
 
-        # نوع جستجو
-        tk.Label(filters_frame, text="نوع جستجو:",
-                 font=self.fonts['normal'], bg=self.colors['card_bg']).grid(row=0, column=0, sticky='w', pady=5, padx=5)
+        tk.Label(header_frame, text="تنظیمات سیستم",
+                 font=self.fonts['title'], bg=self.colors['bg']).pack(side='left')
 
-        search_type = ttk.Combobox(filters_frame, values=['همه', 'کارکنان', 'ورودی‌ها', 'گزارش‌ها', 'اسناد'],
-                                   state='readonly', font=self.fonts['normal'], width=15)
-        search_type.set('همه')
-        search_type.grid(row=0, column=1, sticky='w', pady=5, padx=5)
+        # تنظیمات
+        settings_frame = tk.Frame(self.content_area, bg=self.colors['card_bg'],
+                                  highlightbackground=self.colors['card_border'],
+                                  highlightthickness=1, padx=20, pady=20)
+        settings_frame.pack(fill='x', pady=10)
 
-        # بازه زمانی
-        tk.Label(filters_frame, text="بازه زمانی:",
-                 font=self.fonts['normal'], bg=self.colors['card_bg']).grid(row=0, column=2, sticky='w', pady=5,
-                                                                            padx=20)
+        settings = [
+            ("تم برنامه:", ["روشن", "تیره"]),
+            ("زبان:", ["فارسی", "English"]),
+            ("فرمت تاریخ:", ["۱۴۰۲/۱۰/۱۵", "2023/12/06"]),
+            ("ذخیره‌سازی خودکار:", ["فعال", "غیرفعال"])
+        ]
 
-        date_frame = tk.Frame(filters_frame, bg=self.colors['card_bg'])
-        date_frame.grid(row=0, column=3, sticky='w', pady=5, padx=5)
+        for i, (label, options) in enumerate(settings):
+            tk.Label(settings_frame, text=label, font=self.fonts['normal'],
+                     bg=self.colors['card_bg']).grid(row=i, column=0, sticky='w', pady=10, padx=5)
 
-        tk.Entry(date_frame, width=10, font=self.fonts['normal']).pack(side='left')
-        tk.Label(date_frame, text="تا", bg=self.colors['card_bg']).pack(side='left', padx=2)
-        tk.Entry(date_frame, width=10, font=self.fonts['normal']).pack(side='left')
+            var = tk.StringVar()
+            var.set(options[0])
+            ttk.Combobox(settings_frame, textvariable=var,
+                         values=options, state='readonly',
+                         font=self.fonts['normal']).grid(row=i, column=1, sticky='w', pady=10, padx=5)
 
-        # نتایج جستجو
-        results_frame = tk.Frame(self.content_area, bg=self.colors['bg'])
-        results_frame.pack(fill='both', expand=True, pady=20)
+    # ==================== متدهای کمکی ====================
 
-        tk.Label(results_frame, text="نتایج جستجو:",
-                 font=self.fonts['subtitle'], bg=self.colors['bg']).pack(anchor='w', pady=(0, 10))
+    def create_action_button(self, parent, icon, text, command):
+        """ایجاد دکمه عمل"""
+        btn = tk.Button(parent,
+                        text=f"{icon} {text}",
+                        bg=self.colors['button_primary'],
+                        fg='white',
+                        font=self.fonts['normal'],
+                        padx=15,
+                        pady=8,
+                        cursor='hand2',
+                        command=command)
+        btn.pack(side='left', padx=5)
+        return btn
 
-        # لیست نتایج
-        results_list = tk.Listbox(results_frame, font=self.fonts['normal'],
+    def create_report_card(self, parent, icon, title, desc, command, index):
+        """ایجاد کارت گزارش"""
+        card = tk.Frame(parent, bg=self.colors['card_bg'],
+                        highlightbackground=self.colors['card_border'],
+                        highlightthickness=1, width=200, height=150)
+        card.grid(row=index // 3, column=index % 3, padx=10, pady=10, sticky='nsew')
+
+        content = tk.Frame(card, bg=self.colors['card_bg'], padx=15, pady=15)
+        content.pack(fill='both', expand=True)
+
+        tk.Label(content, text=icon, font=("Segoe UI", 24),
+                 bg=self.colors['card_bg']).pack(pady=(0, 10))
+
+        tk.Label(content, text=title, font=self.fonts['subtitle'],
+                 bg=self.colors['card_bg']).pack(pady=(0, 5))
+
+        tk.Label(content, text=desc, font=self.fonts['small'],
+                 bg=self.colors['card_bg'], fg=self.colors['text_secondary']).pack(pady=(0, 10))
+
+        tk.Button(content, text="ایجاد گزارش",
+                  bg=self.colors['button_primary'], fg='white',
+                  font=self.fonts['small'], command=command).pack()
+
+        return card
+
+    def create_employee_table(self):
+        """ایجاد جدول کارکنان"""
+        table_frame = tk.Frame(self.content_area, bg=self.colors['card_bg'],
+                               highlightbackground=self.colors['card_border'],
+                               highlightthickness=1, padx=10, pady=10)
+        table_frame.pack(fill='both', expand=True, pady=20)
+
+        # ایجاد Treeview
+        columns = ('id', 'name', 'position', 'phone', 'status')
+        tree = ttk.Treeview(table_frame, columns=columns, show='headings', height=8)
+
+        # تعریف ستون‌ها
+        tree.heading('id', text='کد پرسنلی')
+        tree.heading('name', text='نام و نام خانوادگی')
+        tree.heading('position', text='سمت')
+        tree.heading('phone', text='تلفن')
+        tree.heading('status', text='وضعیت')
+
+        tree.column('id', width=80)
+        tree.column('name', width=150)
+        tree.column('position', width=100)
+        tree.column('phone', width=100)
+        tree.column('status', width=80)
+
+        # نوار اسکرول
+        scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscroll=scrollbar.set)
+
+        tree.pack(side='left', fill='both', expand=True)
+        scrollbar.pack(side='right', fill='y')
+
+        # داده‌های نمونه
+        employees = [
+            (1001, 'علی احمدی', 'مدیر فروش', '09123456789', 'فعال'),
+            (1002, 'مریم محمدی', 'حسابدار', '09129876543', 'فعال'),
+            (1003, 'رضا کریمی', 'انباردار', '09131234567', 'فعال'),
+            (1004, 'سارا حسینی', 'منشی', '09137654321', 'مرخصی'),
+            (1005, 'امیر جعفری', 'برنامه نویس', '09149876543', 'فعال')
+        ]
+
+        for emp in employees:
+            tree.insert('', tk.END, values=emp)
+
+    # ==================== متدهای عملیاتی ====================
+
+    def toggle_maximize(self):
+        """تغییر حالت فول اسکرین"""
+        self.is_fullscreen = not self.is_fullscreen
+        self.root.attributes('-fullscreen', self.is_fullscreen)
+
+    def exit_app(self):
+        """خروج از برنامه"""
+        if messagebox.askyesno("خروج", "آیا از برنامه خارج می‌شوید؟"):
+            self.root.quit()
+
+    def create_sample_database(self):
+        """ایجاد دیتابیس نمونه"""
+        try:
+            self.db_connection = sqlite3.connect(':memory:')
+            cursor = self.db_connection.cursor()
+
+            # ایجاد جدول ورودی‌ها
+            cursor.execute('''
+                           CREATE TABLE IF NOT EXISTS entries
+                           (
+                               id
+                               INTEGER
+                               PRIMARY
+                               KEY,
+                               type
+                               TEXT,
+                               title
+                               TEXT,
+                               amount
+                               REAL,
+                               date
+                               TEXT,
+                               description
+                               TEXT
+                           )
+                           ''')
+
+            # ایجاد جدول کارکنان
+            cursor.execute('''
+                           CREATE TABLE IF NOT EXISTS employees
+                           (
+                               id
+                               INTEGER
+                               PRIMARY
+                               KEY,
+                               name
+                               TEXT,
+                               position
+                               TEXT,
+                               department
+                               TEXT,
+                               phone
+                               TEXT,
+                               status
+                               TEXT
+                           )
+                           ''')
+
+            self.db_connection.commit()
+
+        except Exception as e:
+            print(f"خطا در ایجاد دیتابیس: {e}")
+
+    def view_all_data(self):
+        """مشاهده همه داده‌ها"""
+        messagebox.showinfo("اطلاعات", "نمایش همه داده‌ها")
+
+    def backup_database(self):
+        """پشتیبان‌گیری از دیتابیس"""
+        messagebox.showinfo("پشتیبان‌گیری", "پشتیبان‌گیری انجام شد")
+
+    def restore_database(self):
+        """بازیابی دیتابیس"""
+        messagebox.showinfo("بازیابی", "بازیابی انجام شد")
+
+    def edit_database(self):
+        """ویرایش دیتابیس"""
+        messagebox.showinfo("ویرایش", "ویرایش دیتابیس")
+
+    def clean_database(self):
+        """پاکسازی دیتابیس"""
+        if messagebox.askyesno("پاکسازی", "آیا از پاکسازی دیتابیس مطمئن هستید؟"):
+            messagebox.showinfo("پاکسازی", "دیتابیس پاکسازی شد")
+
+    def generate_financial_report(self):
+        """تولید گزارش مالی"""
+        messagebox.showinfo("گزارش مالی", "گزارش مالی تولید شد")
+
+    def generate_sales_report(self):
+        """تولید گزارش فروش"""
+        messagebox.showinfo("گزارش فروش", "گزارش فروش تولید شد")
+
+    def generate_employee_report(self):
+        """تولید گزارش کارکنان"""
+        messagebox.showinfo("گزارش کارکنان", "گزارش کارکنان تولید شد")
+
+    def generate_inventory_report(self):
+        """تولید گزارش موجودی"""
+        messagebox.showinfo("گزارش موجودی", "گزارش موجودی تولید شد")
+
+    def add_employee(self):
+        """افزودن کارمند جدید"""
+        messagebox.showinfo("افزودن کارمند", "فرم افزودن کارمند جدید")
+
+    def edit_employee(self):
+        """ویرایش اطلاعات کارمند"""
+        messagebox.showinfo("ویرایش کارمند", "ویرایش اطلاعات کارمند")
+
+    def delete_employee(self):
+        """حذف کارمند"""
+        if messagebox.askyesno("حذف کارمند", "آیا از حذف کارمند مطمئن هستید؟"):
+            messagebox.showinfo("حذف", "کارمند حذف شد")
+
+    def salary_list(self):
+        """لیست حقوق و دستمزد"""
+        messagebox.showinfo("لیست حقوق", "نمایش لیست حقوق")
+
+    def perform_search(self, query):
+        """انجام جستجو"""
+        if query:
+            messagebox.showinfo("جستجو", f"نتایج جستجو برای: {query}")
+        else:
+            messagebox.showwarning("هشدار", "لطفا عبارت جستجو را وارد کنید")
+
+    def bind_events(self):
+        """اتصال رویدادها"""
+        # کلیدهای میانبر
+        self.root.bind('<F11>', lambda e: self.toggle_maximize())
+        self.root.bind('<Escape>', lambda e: self.toggle_maximize())
+        self.root.bind('<Control-q>', lambda e: self.exit_app())
+        self.root.bind('<Alt-F4>', lambda e: self.exit_app())
+
+        # میانبرهای صفحه‌ها
+        self.root.bind('<F1>', lambda e: self.show_dashboard())
+        self.root.bind('<F2>', lambda e: self.show_new_entry())
+        self.root.bind('<F3>', lambda e: self.show_database())
+        self.root.bind('<F4>', lambda e: self.show_reports())
+        self.root.bind('<F5>', lambda e: self.show_employees())
+        self.root.bind('<F6>', lambda e: self.show_search())
+
+    def run(self):
+        """اجرای برنامه"""
+        # مرکز کردن پنجره
+        self.root.update_idletasks()
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        self.root.geometry(f'{width}x{height}+{x}+{y}')
+
+        self.root.mainloop()
+
+
+# اجرای برنامه
+if __name__ == "__main__":
+    app = BusinessManagementApp()
+    app.run()
