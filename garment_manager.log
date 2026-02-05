@@ -1,0 +1,2 @@
+2026-02-01 05:03:44,128 - GarmentManager - ERROR - خطا در ثبت ورودی: NOT NULL constraint failed: garment_entries.cutting_code
+2026-02-01 05:06:23,612 - GarmentManager - ERROR - خطا در ثبت ورودی: NOT NULL constraint failed: garment_entries.cutting_code
